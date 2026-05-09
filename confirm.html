@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Debrief</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #F5F2EC;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 40px 32px;
+    max-width: 400px;
+    width: 100%;
+    text-align: center;
+    border: 1px solid #E2DDD5;
+  }
+  .logo {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    color: #1A1A1A;
+    margin-bottom: 32px;
+  }
+  .logo span { color: #059669; }
+  .icon { font-size: 48px; margin-bottom: 16px; }
+  h1 { font-size: 22px; font-weight: 700; color: #1A1A1A; margin-bottom: 10px; }
+  p { font-size: 14px; color: #999; line-height: 1.6; margin-bottom: 24px; }
+
+  /* Password reset form */
+  .form { display: none; text-align: left; }
+  .form.visible { display: block; }
+  label { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #999; display: block; margin-bottom: 6px; }
+  input {
+    width: 100%;
+    border: 1px solid #E2DDD5;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 15px;
+    color: #1A1A1A;
+    background: #F5F2EC;
+    margin-bottom: 16px;
+    outline: none;
+  }
+  input:focus { border-color: #1A1A1A; }
+  button {
+    width: 100%;
+    background: #1A1A1A;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+  }
+  button:hover { background: #333; }
+  button:disabled { background: #ccc; cursor: not-allowed; }
+  .error { font-size: 13px; color: #DC2626; margin-bottom: 12px; display: none; }
+  .error.visible { display: block; }
+  .back-link { font-size: 13px; color: #999; text-decoration: none; display: inline-block; margin-top: 16px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">DEBR<span>IE</span>F</div>
+
+  <!-- Email confirmed state -->
+  <div id="confirmed">
+    <div class="icon">✅</div>
+    <h1>Email confirmed</h1>
+    <p>Your account is ready. Open the Debrief app on your phone to start journaling.</p>
+  </div>
+
+  <!-- Password reset state -->
+  <div id="reset">
+    <div class="icon">🔑</div>
+    <h1>New password</h1>
+    <p>Enter a new password for your Debrief account.</p>
+    <div class="form visible" id="resetForm">
+      <div class="error" id="errorMsg"></div>
+      <label>New password</label>
+      <input type="password" id="password" placeholder="6+ characters" minlength="6" />
+      <label>Confirm password</label>
+      <input type="password" id="confirmPassword" placeholder="Same as above" />
+      <button onclick="resetPassword()" id="submitBtn">Set new password</button>
+    </div>
+    <div id="resetSuccess" style="display:none;">
+      <div class="icon" style="margin-top:8px;">🎉</div>
+      <p style="margin-top:8px;">Password updated. Open Debrief and log in with your new password.</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = 'https://xrczqkjqnylkulfbhxvw.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhyY3pxa2pxbnlsa3VsZmJoeHZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NjgwNTMsImV4cCI6MjA5MzA0NDA1M30.gfhVowkB5gdmUZNT0jMo_FUtsnNxYbxDNaRjBQipVis';
+  const { createClient } = supabase;
+  const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Parse URL hash for type
+  const hash = window.location.hash.substring(1);
+  const params = new URLSearchParams(hash);
+  const type = params.get('type');
+  const accessToken = params.get('access_token');
+
+  // Show correct state
+  document.getElementById('confirmed').style.display = 'none';
+  document.getElementById('reset').style.display = 'none';
+
+  if (type === 'recovery') {
+    document.getElementById('reset').style.display = 'block';
+    // Set session from token
+    if (accessToken) {
+      client.auth.setSession({
+        access_token: accessToken,
+        refresh_token: params.get('refresh_token')
+      });
+    }
+  } else {
+    document.getElementById('confirmed').style.display = 'block';
+  }
+
+  async function resetPassword() {
+    const btn = document.getElementById('submitBtn');
+    const err = document.getElementById('errorMsg');
+    const pw = document.getElementById('password').value;
+    const cpw = document.getElementById('confirmPassword').value;
+
+    err.classList.remove('visible');
+
+    if (pw.length < 6) {
+      err.textContent = 'Password must be at least 6 characters.';
+      err.classList.add('visible');
+      return;
+    }
+    if (pw !== cpw) {
+      err.textContent = 'Passwords do not match.';
+      err.classList.add('visible');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
+
+    const { error } = await client.auth.updateUser({ password: pw });
+
+    if (error) {
+      err.textContent = error.message;
+      err.classList.add('visible');
+      btn.disabled = false;
+      btn.textContent = 'Set new password';
+    } else {
+      document.getElementById('resetForm').style.display = 'none';
+      document.getElementById('resetSuccess').style.display = 'block';
+    }
+  }
+</script>
+</body>
+</html>
